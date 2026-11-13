@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titulo %}{{ topic.title }}{% endblock %}
+{% block contenido %}
+<header class="encabezado">
+  <div>
+    <p class="chico"><a href="/temas">Temas</a></p>
+    <h1>{{ topic.title }}</h1>
+    <p class="suave">Origen: {{ "Investigador" if topic.origin == "agent" else "Tú" }} ·
+      {% if topic.status == "proposed" %}Propuesto{% elif topic.status == "used" %}Convertido en video{% else %}Descartado{% endif %}</p>
+  </div>
+  <div class="fila">
+    {% if topic.status == "proposed" %}
+    <form method="post" action="/temas/{{ topic.id }}/descartar" class="en-linea">
+      <button class="boton" type="submit">Descartar</button>
+    </form>
+    <form method="post" action="/temas/{{ topic.id }}/video" class="en-linea">
+      <button class="boton primario" type="submit">Hacer video</button>
+    </form>
+    {% elif topic.status == "discarded" %}
+    <form method="post" action="/temas/{{ topic.id }}/recuperar" class="en-linea">
+      <button class="boton" type="submit">Recuperar</button>
+    </form>
+    {% endif %}
+  </div>
+</header>
+
+{% if topic.videos %}
+<section class="tarjeta seccion">
+  <h2>Videos de este tema</h2>
+  {% for v in topic.videos %}
+  <p><a href="/videos/{{ v.id }}">{{ v.title }}</a> · <span class="etiqueta {{ video_status[v.status][1] }}">{{ video_status[v.status][0] }}</span></p>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% set volver = "/temas/" ~ topic.id %}
+{% include "_datos.html" %}
+{% endblock %}

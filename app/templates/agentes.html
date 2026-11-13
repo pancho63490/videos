@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block titulo %}Agentes{% endblock %}
+{% block contenido %}
+<header class="encabezado">
+  <div>
+    <h1>Agentes</h1>
+    <p class="suave">Los siete agentes que producirán cada video. Puedes activar o pausar cada uno, o todos a la vez.</p>
+  </div>
+  <div class="fila">
+    <form method="post" action="/agentes/pausar-todos" class="en-linea">
+      <button class="boton" type="submit">Pausar todos</button>
+    </form>
+    <form method="post" action="/agentes/activar-todos" class="en-linea">
+      <button class="boton primario" type="submit">Activar todos</button>
+    </form>
+  </div>
+</header>
+
+<p class="aviso error">Los agentes todavía no están programados. Esta pantalla ya guarda su estado y su registro, pero "Ejecutar" aún no produce nada.</p>
+
+<div class="rejilla">
+  {% for c in cards %}
+  {% set etiqueta, color = agent_status[c.agent.status] %}
+  <article class="tarjeta agente">
+    <div class="titulo">
+      <h2>{{ c.agent.run_order }}. {{ c.agent.name }}</h2>
+      <span class="etiqueta {{ color }}">{{ etiqueta }}</span>
+    </div>
+    <p class="suave chico">{{ c.agent.description }}</p>
+    <p class="chico">{{ c.summary }}</p>
+    <div class="fila">
+      <form method="post" action="/agentes/{{ c.agent.id }}/ejecutar" class="en-linea">
+        <button class="boton contorno chico" type="submit">Ejecutar</button>
+      </form>
+      <form method="post" action="/agentes/{{ c.agent.id }}/alternar" class="en-linea">
+        <button class="boton chico" type="submit">{{ "Pausar" if c.agent.status == "active" else "Activar" }}</button>
+      </form>
+      <a class="enlace chico" href="/agentes/{{ c.agent.id }}/registro">Ver registro</a>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% endblock %}

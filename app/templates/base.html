@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{% block titulo %}Panel{% endblock %} · {{ channel_name }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+<nav class="menu" aria-label="Secciones">
+  <div class="marca">
+    <strong>{{ channel_name }}</strong>
+    <span>Panel de administración</span>
+  </div>
+  <ul>
+    {% set secciones = [("/cola", "Cola de aprobación"), ("/calendario", "Calendario"), ("/temas", "Temas"), ("/videos", "Videos"), ("/agentes", "Agentes"), ("/ajustes", "Ajustes")] %}
+    {% for url, nombre in secciones %}
+    <li>
+      <a class="item" href="{{ url }}" {% if path.startswith(url) %}aria-current="page"{% endif %}>
+        {{ nombre }}
+        {% if url == "/cola" and pending_count %}<span class="contador">{{ pending_count }}</span>{% endif %}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  <form method="post" action="/logout">
+    <button class="salir" type="submit">Cerrar sesión</button>
+  </form>
+</nav>
+<main class="contenido">
+  {% if flash %}<p class="aviso" role="status">{{ flash }}</p>{% endif %}
+  {% block contenido %}{% endblock %}
+</main>
+</div>
+</body>
+</html>

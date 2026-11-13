@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block titulo %}Temas{% endblock %}
+{% block contenido %}
+<header class="encabezado">
+  <div>
+    <h1>Temas</h1>
+    <p class="suave">Aquí decides qué temas se convierten en video. Cada dato necesita dos fuentes para contar como verificado.</p>
+  </div>
+</header>
+
+<form method="post" action="/temas" class="tarjeta fila" style="align-items: flex-end; gap: 12px">
+  <label class="campo" style="flex: 1 1 320px">Nuevo tema
+    <input type="text" name="titulo" maxlength="300" placeholder="Escribe una curiosidad que quieras contar" required>
+  </label>
+  <button class="boton primario" type="submit">Agregar tema</button>
+</form>
+
+<div class="fila">
+  <a class="filtro" href="/temas?estado=proposed" aria-current="{{ 'true' if estado == 'proposed' else 'false' }}">Propuestos</a>
+  <a class="filtro" href="/temas?estado=used" aria-current="{{ 'true' if estado == 'used' else 'false' }}">Convertidos en video</a>
+  <a class="filtro" href="/temas?estado=discarded" aria-current="{{ 'true' if estado == 'discarded' else 'false' }}">Descartados</a>
+</div>
+
+{% if not topics %}
+<div class="vacio"><p>No hay temas en esta lista.</p></div>
+{% else %}
+<div class="tabla-caja">
+  <table>
+    <thead>
+      <tr><th scope="col">Tema</th><th scope="col">Origen</th><th scope="col">Verificación</th><th scope="col">Acciones</th></tr>
+    </thead>
+    <tbody>
+      {% for t in topics %}
+      <tr>
+        <td><a href="/temas/{{ t.id }}">{{ t.title }}</a></td>
+        <td class="chico">{{ "Investigador" if t.origin == "agent" else "Tú" }}</td>
+        <td>
+          {% if t.is_verified %}
+          <span class="etiqueta verde">{{ t.total_facts }} {{ "dato verificado" if t.total_facts == 1 else "datos verificados" }}</span>
+          {% elif t.total_facts == 0 %}
+          <span class="etiqueta ambar">Sin datos</span>
+          {% else %}
+          <span class="etiqueta ambar">Faltan {{ t.unverified_facts }} de {{ t.total_facts }}</span>
+          {% endif %}
+        </td>
+        <td class="acciones">
+          <div class="fila">
+            {% if estado == "proposed" %}
+            <form method="post" action="/temas/{{ t.id }}/video" class="en-linea">
+              <button class="boton contorno chico" type="submit">Hacer video</button>
+            </form>
+            <form method="post" action="/temas/{{ t.id }}/descartar" class="en-linea">
+              <button class="boton chico" type="submit">Descartar</button>
+            </form>
+            {% elif estado == "discarded" %}
+            <form method="post" action="/temas/{{ t.id }}/recuperar" class="en-linea">
+              <button class="boton chico" type="submit">Recuperar</button>
+            </form>
+            {% else %}
+            <a class="enlace chico" href="/temas/{{ t.id }}">Ver datos</a>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

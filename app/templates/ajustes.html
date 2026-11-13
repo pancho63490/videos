@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block titulo %}Ajustes{% endblock %}
+{% block contenido %}
+<header class="encabezado">
+  <div>
+    <h1>Ajustes</h1>
+    <p class="suave">Cómo publica el canal y qué cuentas están conectadas.</p>
+  </div>
+</header>
+
+<form method="post" action="/ajustes" class="pila" style="gap: 24px">
+  <section class="tarjeta seccion" aria-labelledby="canal">
+    <h2 id="canal">Canal</h2>
+    <div class="campos">
+      <label class="campo">Nombre del canal
+        <input type="text" name="channel_name" value="{{ settings.channel_name }}" maxlength="80" placeholder="Como aparece en tus redes">
+      </label>
+      <label class="campo">Zona horaria
+        <input type="text" name="tz_name" value="{{ settings.timezone }}" placeholder="America/Ciudad_Juarez">
+      </label>
+    </div>
+  </section>
+
+  <section class="tarjeta seccion" aria-labelledby="modo">
+    <h2 id="modo">Modo de publicación</h2>
+    <label class="opcion">
+      <input type="radio" name="publish_mode" value="approval" {{ "checked" if settings.publish_mode != "automatic" }}>
+      <span><strong>Con mi aprobación</strong><span class="suave chico">Cada video espera en la cola hasta que lo apruebes. Recomendado.</span></span>
+    </label>
+    <label class="opcion">
+      <input type="radio" name="publish_mode" value="automatic" {{ "checked" if settings.publish_mode == "automatic" }}>
+      <span><strong>Totalmente automático</strong><span class="suave chico">Los videos se aprueban sin revisión. Mayor riesgo de desmonetización y de publicar datos falsos.</span></span>
+    </label>
+  </section>
+
+  <section class="tarjeta seccion" aria-labelledby="ritmo">
+    <h2 id="ritmo">Ritmo de publicación</h2>
+    <div class="campos">
+      <label class="campo corto">Cortos por semana
+        <input type="number" name="shorts_per_week" min="0" max="14" value="{{ settings.shorts_per_week }}">
+      </label>
+      <label class="campo corto">Largos por semana
+        <input type="number" name="longs_per_week" min="0" max="7" value="{{ settings.longs_per_week }}">
+      </label>
+      <label class="campo corto">Hora de publicación
+        <input type="time" name="publish_time_local" value="{{ settings.publish_time_local }}">
+      </label>
+    </div>
+  </section>
+
+  <div><button class="boton primario" type="submit">Guardar ajustes</button></div>
+</form>
+
+<section class="tarjeta seccion" aria-labelledby="conexiones">
+  <div>
+    <h2 id="conexiones">Conexiones</h2>
+    <p class="suave chico">La conexión con cada plataforma se agregará junto con el agente publicador. Las claves nunca se guardan en la base de datos, solo en variables de entorno.</p>
+  </div>
+  <div class="rejilla chica">
+    {% for a in accounts %}
+    {% set etiqueta, color = connection_status[a.status] %}
+    <div class="tarjeta pila" style="gap: 10px; padding: 16px">
+      <strong>{{ a.platform.name }}</strong>
+      <span><span class="etiqueta {{ color }}">{{ etiqueta }}</span></span>
+    </div>
+    {% endfor %}
+    {% for s in services %}
+    {% set etiqueta, color = connection_status[s.status] %}
+    <div class="tarjeta pila" style="gap: 10px; padding: 16px">
+      <strong>{{ s.name }}</strong>
+      <span><span class="etiqueta {{ color }}">{{ etiqueta }}</span></span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

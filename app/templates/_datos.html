@@ -1,0 +1,43 @@
+{# Lista de datos de un tema y formulario para agregar uno. Requiere: topic, volver #}
+<section class="tarjeta seccion" aria-labelledby="datos-titulo">
+  <div>
+    <h2 id="datos-titulo">Datos y fuentes</h2>
+    <p class="suave chico">Registra cada afirmación del video con dos fuentes. Con menos de dos, el dato queda como no verificado.</p>
+  </div>
+  {% for f in topic.facts %}
+  <div class="dato">
+    <div style="flex: 1 1 320px; min-width: 0">
+      <p>{{ f.claim }}</p>
+      {% if f.sources %}
+      <ul>
+        {% for s in f.sources %}<li><a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">{{ s.url }}</a></li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    <div class="fila">
+      {% if f.verified %}<span class="etiqueta verde">Verificado</span>{% else %}<span class="etiqueta ambar">Por verificar</span>{% endif %}
+      <form method="post" action="/datos/{{ f.id }}/eliminar" class="en-linea">
+        <input type="hidden" name="volver" value="{{ volver }}">
+        <button class="boton chico" type="submit" aria-label="Eliminar dato: {{ f.claim }}">Eliminar</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <p class="suave chico">Todavía no hay datos registrados para este tema.</p>
+  {% endfor %}
+  <form method="post" action="/temas/{{ topic.id }}/datos" class="pila" style="border-top: 1px solid var(--borde); padding-top: 16px">
+    <input type="hidden" name="volver" value="{{ volver }}">
+    <label class="campo">Dato o afirmación
+      <input type="text" name="dato" placeholder="Por ejemplo: En Oxford ya se enseñaba en 1096" required>
+    </label>
+    <div class="campos">
+      <label class="campo">Fuente 1 (enlace)
+        <input type="url" name="fuente1" placeholder="https://">
+      </label>
+      <label class="campo">Fuente 2 (enlace)
+        <input type="url" name="fuente2" placeholder="https://">
+      </label>
+    </div>
+    <div><button class="boton" type="submit">Agregar dato</button></div>
+  </form>
+</section>

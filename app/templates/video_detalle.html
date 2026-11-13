@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block titulo %}{{ video.title }}{% endblock %}
+{% block contenido %}
+<header class="encabezado">
+  <div>
+    <p class="chico"><a href="/videos">Videos</a></p>
+    <h1>{{ video.title }}</h1>
+    <p><span class="etiqueta {{ video_status[video.status][1] }}">{{ video_status[video.status][0] }}</span>
+      <span class="suave chico">· {{ fmt_datetime(video.scheduled_at) }}</span></p>
+  </div>
+  <div class="fila">
+    {% if video.status in ["in_production", "rejected"] %}
+    <form method="post" action="/videos/{{ video.id }}/revision" class="en-linea">
+      <button class="boton primario" type="submit">Enviar a revisión</button>
+    </form>
+    {% endif %}
+    {% if video.status == "pending_review" %}
+    <form method="post" action="/videos/{{ video.id }}/rechazar" class="en-linea">
+      <button class="boton" type="submit">Rechazar</button>
+    </form>
+    <form method="post" action="/videos/{{ video.id }}/aprobar" class="en-linea">
+      <button class="boton primario" type="submit">Aprobar</button>
+    </form>
+    {% endif %}
+    {% if video.status in ["approved", "scheduled", "pending_review"] %}
+    <form method="post" action="/videos/{{ video.id }}/reabrir" class="en-linea">
+      <button class="boton" type="submit">Regresar a producción</button>
+    </form>
+    {% endif %}
+  </div>
+</header>
+
+{% if video.review_note %}
+<p class="aviso error">Nota del rechazo: {{ video.review_note }}</p>
+{% endif %}
+
+<form method="post" action="/videos/{{ video.id }}" class="tarjeta seccion">
+  <h2>Datos del video</h2>
+  <label class="campo">Título
+    <input type="text" name="titulo" value="{{ video.title }}" maxlength="300" required>
+  </label>
+  <div class="campos">
+    <label class="campo corto">Formato
+      <select name="formato">
+        <option value="short" {{ "selected" if video.format == "short" }}>Corto</option>
+        <option value="long" {{ "selected" if video.format == "long" }}>Largo</option>
+      </select>
+    </label>
+    <label class="campo">Fecha y hora de publicación
+      <input type="datetime-local" name="programado" value="{{ scheduled_value }}">
+    </label>
+    <label class="campo corto">Duración (segundos)
+      <input type="number" name="duracion" min="0" max="7200" value="{{ video.duration_s if video.duration_s else '' }}">
+    </label>
+  </div>
+
+  <h2 style="margin-top: 8px">Guion</h2>
+  <label class="campo">Gancho (0 a 3 segundos)
+    <textarea name="gancho" rows="2">{{ script.hook if script else "" }}</textarea>
+  </label>
+  <label class="campo">Prueba (el dato con fechas o números)
+    <textarea name="prueba" rows="4">{{ script.proof if script else "" }}</textarea>
+  </label>
+  <label class="campo">Giro (un segundo dato que sorprende más)
+    <textarea name="giro" rows="4">{{ script.twist if script else "" }}</textarea>
+  </label>
+  <label class="campo">Opinión (lo que piensas tú)
+    <textarea name="opinion" rows="3">{{ script.opinion if script else "" }}</textarea>
+  </label>
+  <div><button class="boton primario" type="submit">Guardar cambios</button></div>
+</form>
+
+{% if video.topic %}
+{% set topic = video.topic %}
+{% set volver = "/videos/" ~ video.id %}
+{% include "_datos.html" %}
+{% else %}
+<p class="suave chico">Este video no está ligado a un tema, así que no tiene datos que verificar.</p>
+{% endif %}
+
+<form method="post" action="/videos/{{ video.id }}/eliminar" onsubmit="return confirm('¿Eliminar este video? No se puede deshacer.')">
+  <button class="boton peligro" type="submit">Eliminar video</button>
+</form>
+{% endblock %}

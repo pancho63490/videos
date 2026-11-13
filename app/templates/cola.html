@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block titulo %}Cola de aprobación{% endblock %}
+{% block contenido %}
+<header class="encabezado">
+  <div>
+    <h1>Cola de aprobación</h1>
+    {% if videos %}
+    <p class="suave">{{ videos|length }} {{ "video espera" if videos|length == 1 else "videos esperan" }} tu revisión. Nada se publica sin tu visto bueno.</p>
+    {% else %}
+    <p class="suave">No hay videos esperando revisión.</p>
+    {% endif %}
+  </div>
+  {% if verified_count %}
+  <form method="post" action="/cola/aprobar-verificados">
+    <button class="boton contorno" type="submit">Aprobar los verificados ({{ verified_count }})</button>
+  </form>
+  {% endif %}
+</header>
+
+{% if settings.publish_mode == "automatic" %}
+<p class="aviso error">El modo totalmente automático está activo: los videos nuevos se aprueban sin pasar por esta cola. Puedes cambiarlo en <a href="/ajustes">Ajustes</a>.</p>
+{% endif %}
+
+{% if not videos %}
+<div class="vacio">
+  <p>Cuando un video esté terminado aparecerá aquí para que lo apruebes o lo rechaces.</p>
+  <p class="chico" style="margin-top: 8px">Puedes crear uno desde <a href="/temas">Temas</a>.</p>
+</div>
+{% endif %}
+
+<section class="pila" aria-label="Videos por revisar">
+  {% for v in videos %}
+  <article class="tarjeta video">
+    <div class="miniatura" aria-hidden="true">{{ "9:16" if v.format == "short" else "16:9" }}</div>
+    <div class="datos">
+      <h2>{{ v.title }}</h2>
+      <p class="suave chico">{{ "Corto" if v.format == "short" else "Largo" }} · {{ fmt_duration(v.duration_s) }} · {{ fmt_datetime(v.scheduled_at) }}</p>
+      <div class="fila">
+        {% if v.is_verified %}
+        <span class="etiqueta verde">{{ v.total_facts }} {{ "dato verificado" if v.total_facts == 1 else "datos verificados" }}</span>
+        {% elif v.total_facts == 0 %}
+        <span class="etiqueta ambar">Sin datos registrados</span>
+        {% else %}
+        <span class="etiqueta ambar">Falta verificar {{ v.unverified_facts }} de {{ v.total_facts }}</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="fila">
+      <a class="enlace" href="/videos/{{ v.id }}">Ver guion</a>
+      <form method="post" action="/videos/{{ v.id }}/rechazar" class="en-linea">
+        <button class="boton" type="submit">Rechazar</button>
+      </form>
+      <form method="post" action="/videos/{{ v.id }}/aprobar" class="en-linea">
+        <button class="boton primario" type="submit">Aprobar</button>
+      </form>
+    </div>
+  </article>
+  {% endfor %}
+</section>
+{% endblock %}

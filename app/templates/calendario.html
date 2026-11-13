@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block titulo %}Calendario{% endblock %}
+{% block contenido %}
+<header class="encabezado">
+  <div>
+    <h1>Calendario</h1>
+    <p class="suave">{{ title }} · {{ shorts }} {{ "corto" if shorts == 1 else "cortos" }} y {{ longs }} {{ "video largo" if longs == 1 else "videos largos" }}</p>
+  </div>
+  <div class="fila">
+    <a class="boton" href="/calendario?semana={{ semana - 1 }}">Semana anterior</a>
+    {% if semana != 0 %}<a class="boton" href="/calendario">Hoy</a>{% endif %}
+    <a class="boton" href="/calendario?semana={{ semana + 1 }}">Semana siguiente</a>
+  </div>
+</header>
+
+<div class="tabla-caja">
+  <div class="semana">
+    {% for d in days %}
+    <section class="dia {{ 'hoy' if d.is_today }}">
+      <h2>{{ d.label }}{% if d.is_today %} · hoy{% endif %}</h2>
+      {% for item in d['items'] %}
+      {% set etiqueta, color = video_status[item.video.status] %}
+      <a class="cita {{ color }}" href="/videos/{{ item.video.id }}">
+        <strong>{{ item.hora }} · {{ etiqueta }}</strong>
+        <span>{{ item.video.title }}</span>
+        <small>{{ "Corto" if item.video.format == "short" else "Largo" }}</small>
+      </a>
+      {% else %}
+      <p class="suave chico">Sin video</p>
+      {% endfor %}
+    </section>
+    {% endfor %}
+  </div>
+</div>
+
+<p class="suave chico">Para programar un video, ábrelo desde <a href="/videos">Videos</a> y asígnale fecha y hora. Meta semanal: {{ settings.shorts_per_week }} cortos y {{ settings.longs_per_week }} largos.</p>
+{% endblock %}

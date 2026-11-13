@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block titulo %}Videos{% endblock %}
+{% block contenido %}
+<header class="encabezado">
+  <div>
+    <h1>Videos</h1>
+    <p class="suave">Todos los videos del canal, en cualquier estado.</p>
+  </div>
+</header>
+
+<div class="fila" style="align-items: flex-end">
+  <a class="filtro" href="/videos" aria-current="{{ 'true' if not estado else 'false' }}">Todos</a>
+  {% for codigo in ["in_production", "pending_review", "approved", "scheduled", "published", "rejected"] %}
+  <a class="filtro" href="/videos?estado={{ codigo }}" aria-current="{{ 'true' if estado == codigo else 'false' }}">{{ video_status[codigo][0] }}</a>
+  {% endfor %}
+  <form method="get" action="/videos" class="fila" style="flex: 1 1 260px; align-items: flex-end; flex-wrap: nowrap">
+    {% if estado %}<input type="hidden" name="estado" value="{{ estado }}">{% endif %}
+    <label class="campo" style="flex: 1">Buscar
+      <input type="search" name="q" value="{{ q }}" placeholder="Título del video">
+    </label>
+    <button class="boton" type="submit">Buscar</button>
+  </form>
+</div>
+
+{% if not videos %}
+<div class="vacio">
+  <p>No hay videos que coincidan.</p>
+  <p class="chico" style="margin-top: 8px">Crea uno desde <a href="/temas">Temas</a> con el botón "Hacer video".</p>
+</div>
+{% else %}
+<div class="tabla-caja">
+  <table>
+    <thead>
+      <tr><th scope="col">Video</th><th scope="col">Formato</th><th scope="col">Estado</th><th scope="col">Fecha</th><th scope="col">Acciones</th></tr>
+    </thead>
+    <tbody>
+      {% for v in videos %}
+      <tr>
+        <td><a href="/videos/{{ v.id }}">{{ v.title }}</a></td>
+        <td class="chico">{{ "Corto" if v.format == "short" else "Largo" }}</td>
+        <td><span class="etiqueta {{ video_status[v.status][1] }}">{{ video_status[v.status][0] }}</span></td>
+        <td class="chico">{{ fmt_datetime(v.scheduled_at) }}</td>
+        <td class="acciones">
+          <div class="fila">
+            <a class="enlace chico" href="/videos/{{ v.id }}">Ver y editar</a>
+            <form method="post" action="/videos/{{ v.id }}/eliminar" class="en-linea" onsubmit="return confirm('¿Eliminar este video? No se puede deshacer.')">
+              <button class="boton peligro chico" type="submit" aria-label="Eliminar video: {{ v.title }}">Eliminar</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

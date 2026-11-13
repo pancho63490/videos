@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block titulo %}Registro de {{ agent.name }}{% endblock %}
+{% block contenido %}
+<header class="encabezado">
+  <div>
+    <p class="chico"><a href="/agentes">Agentes</a></p>
+    <h1>Registro de {{ agent.name }}</h1>
+    <p class="suave">{{ agent.description }}. Se muestran las últimas 100 ejecuciones.</p>
+  </div>
+</header>
+
+{% if not runs %}
+<div class="vacio"><p>Este agente aún no tiene ejecuciones.</p></div>
+{% else %}
+<div class="tabla-caja">
+  <table>
+    <thead>
+      <tr><th scope="col">Inicio</th><th scope="col">Origen</th><th scope="col">Resultado</th><th scope="col">Detalle</th></tr>
+    </thead>
+    <tbody>
+      {% for r in runs %}
+      <tr>
+        <td class="chico">{{ fmt_datetime(r.started_at) }}</td>
+        <td class="chico">{{ "Manual" if r.trigger == "manual" else "Programada" }}</td>
+        <td class="chico">{{ run_status.get(r.status, r.status)|capitalize }}</td>
+        <td><pre class="registro">{{ r.error or r.log or "" }}</pre></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
