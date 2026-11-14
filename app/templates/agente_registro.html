@@ -23,7 +23,7 @@
         <td class="chico">{{ fmt_datetime(r.started_at) }}</td>
         <td class="chico">{{ "Manual" if r.trigger == "manual" else "Programada" }}</td>
         <td class="chico">{{ run_status.get(r.status, r.status)|capitalize }}</td>
-        <td><pre class="registro">{{ r.error or r.log or "" }}</pre></td>
+        <td>{% if r.log %}<pre class="registro">{{ r.log }}</pre>{% endif %}{% if r.error %}<pre class="registro" style="color: var(--rojo); font-weight: 600">{{ r.error }}</pre>{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, FastAPI, Form, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -15,11 +15,13 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 from starlette.middleware.sessions import SessionMiddleware
 
+from .agents import llm, runner
 from .db import Base, SessionLocal, engine, get_db
 from .models import (
     Agent,
     AgentRun,
     Fact,
+    OpinionBank,
     PlatformAccount,
     Script,
     ServiceConnection,
@@ -358,6 +360,17 @@ def add_topic(request: Request, titulo: str = Form(""), db: Session = Depends(ge
     return redirect("/temas")
 
 
+@panel.post("/temas/pedir")
+def request_topics(request: Request, background: BackgroundTasks, cantidad: int = Form(5)):
+    count = max(1, min(10, cantidad))
+    launch_agent(
+        background, request, "researcher",
+        f"El investigador está buscando {count} temas. Tarda uno o dos minutos; recarga esta página.",
+        count=count,
+    )
+    return redirect("/temas")
+
+
 @panel.get("/temas/{topic_id}", response_class=HTMLResponse)
 def topic_detail(topic_id: int, request: Request, db: Session = Depends(get_db)):
     return render(request, db, "tema_detalle.html", topic=get_topic(db, topic_id))
@@ -538,6 +551,20 @@ def send_to_review(video_id: int, request: Request, db: Session = Depends(get_db
     return redirect(f"/videos/{video.id}")
 
 
+@panel.post("/videos/{video_id}/guion")
+def write_script(video_id: int, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
+    video = get_video(db, video_id)
+    if not video.topic or not any(f.verified for f in video.topic.facts):
+        flash(request, "El guionista solo usa datos verificados. Agrega al menos un dato con dos fuentes.")
+        return redirect(f"/videos/{video.id}")
+    launch_agent(
+        background, request, "writer",
+        "El guionista está escribiendo el guion. Recarga esta página en un minuto.",
+        video_id=video.id,
+    )
+    return redirect(f"/videos/{video.id}")
+
+
 @panel.post("/videos/{video_id}/reabrir")
 def reopen_video(video_id: int, request: Request, db: Session = Depends(get_db)):
     video = get_video(db, video_id)
@@ -571,8 +598,10 @@ def agents(request: Request, db: Session = Depends(get_db)):
             summary = "Aún sin ejecuciones"
         else:
             summary = f"Última ejecución: {fmt_datetime(last.started_at, tz)}, {RUN_STATUS.get(last.status, last.status)}"
-        cards.append({"agent": agent, "summary": summary, "last": last})
-    return render(request, db, "agentes.html", cards=cards)
+        cards.append(
+            {"agent": agent, "summary": summary, "last": last, "ready": agent.code in runner.IMPLEMENTED}
+        )
+    return render(request, db, "agentes.html", cards=cards, llm_ready=llm.is_configured())
 
 
 @panel.post("/agentes/pausar-todos")
@@ -602,13 +631,38 @@ def toggle_agent(agent_id: int, request: Request, db: Session = Depends(get_db))
     return redirect("/agentes")
 
 
+def launch_agent(background: BackgroundTasks, request: Request, code: str, message: str, **params) -> bool:
+    """Arranca un agente en segundo plano. Devuelve False si falta la clave del modelo."""
+    if not llm.is_configured():
+        flash(request, "Falta la clave del modelo de IA: agrega la variable de entorno ANTHROPIC_API_KEY.")
+        return False
+    run_id = runner.start_run(code)
+    background.add_task(runner.execute, run_id, code, **params)
+    flash(request, message)
+    return True
+
+
 @panel.post("/agentes/{agent_id}/ejecutar")
-def run_agent(agent_id: int, request: Request, db: Session = Depends(get_db)):
+def run_agent(
+    agent_id: int, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)
+):
     agent = db.get(Agent, agent_id)
     if agent is None:
         raise HTTPException(status_code=404, detail="Agente no encontrado")
-    # Los agentes todavía no están programados. Se deja constancia del intento
-    # para que el registro y esta pantalla ya funcionen cuando se conecten.
+    if agent.code == "researcher":
+        launch_agent(
+            background, request, "researcher",
+            "El investigador está buscando 5 temas. Tarda uno o dos minutos; revisa Temas o su registro.",
+            count=5,
+        )
+        return redirect("/agentes")
+    if agent.code == "writer":
+        launch_agent(
+            background, request, "writer",
+            "El guionista está escribiendo los guiones vacíos. Revisa la cola de aprobación en un minuto.",
+        )
+        return redirect("/agentes")
+    # Los demás agentes todavía no están programados. Se deja constancia del intento.
     now = utcnow()
     db.add(
         AgentRun(
@@ -633,7 +687,7 @@ def agent_log(agent_id: int, request: Request, db: Session = Depends(get_db)):
     runs = (
         db.query(AgentRun)
         .filter(AgentRun.agent_id == agent.id)
-        .order_by(AgentRun.started_at.desc())
+        .order_by(AgentRun.started_at.desc(), AgentRun.id.desc())
         .limit(100)
         .all()
     )
@@ -652,7 +706,37 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
         .all()
     )
     services = db.query(ServiceConnection).order_by(ServiceConnection.id).all()
-    return render(request, db, "ajustes.html", accounts=accounts, services=services)
+    opinions = db.query(OpinionBank).order_by(OpinionBank.id.desc()).all()
+    return render(
+        request,
+        db,
+        "ajustes.html",
+        accounts=accounts,
+        services=services,
+        opinions=opinions,
+        llm_ready=llm.is_configured(),
+        llm_model=llm.model_name(),
+    )
+
+
+@panel.post("/opiniones")
+def add_opinion(request: Request, texto: str = Form(""), db: Session = Depends(get_db)):
+    text = texto.strip()
+    if text:
+        db.add(OpinionBank(text=text[:1000]))
+        db.commit()
+        flash(request, "Frase agregada.")
+    return redirect("/ajustes#opiniones")
+
+
+@panel.post("/opiniones/{opinion_id}/eliminar")
+def delete_opinion(opinion_id: int, request: Request, db: Session = Depends(get_db)):
+    opinion = db.get(OpinionBank, opinion_id)
+    if opinion is not None:
+        db.delete(opinion)
+        db.commit()
+        flash(request, "Frase eliminada.")
+    return redirect("/ajustes#opiniones")
 
 
 @panel.post("/ajustes")

@@ -14,11 +14,14 @@ SQLite en tu computadora.
 - **Cola de aprobación:** aprobar o rechazar cada video, o aprobar de una vez los verificados.
 - **Calendario:** vista semanal de lo programado, en tu zona horaria.
 - **Agentes:** activar o pausar cada uno o todos, y ver su registro.
-- **Ajustes:** nombre del canal, modo de publicación, ritmo semanal y hora.
+- **Agente investigador:** busca en la web, propone temas nuevos y registra cada dato con sus fuentes. Solo acepta enlaces que la búsqueda devolvió de verdad, y un dato cuenta como verificado con dos fuentes de sitios distintos.
+- **Agente guionista:** escribe el guion usando únicamente los datos verificados del tema y tus frases de opinión, y manda el video a revisión.
+- **Ajustes:** nombre del canal, modo de publicación, ritmo semanal, hora y tus frases de opinión.
 
 ## Qué falta
 
-- Los siete agentes todavía no están programados: "Ejecutar" solo deja constancia en el registro.
+- Los agentes de voz, visuales, editor, publicador y analista todavía no están programados: "Ejecutar" solo deja constancia en su registro.
+- Los agentes se ejecutan a mano desde el panel; todavía no hay ejecución programada.
 - La conexión con YouTube, TikTok, Facebook e Instagram llegará con el agente publicador.
 - No hay métricas todavía; las tablas ya existen.
 
@@ -66,6 +69,12 @@ de datos se crea sola en el archivo `canal.db`.
 | `ADMIN_PASSWORD` | Contraseña para entrar al panel | Sí |
 | `SECRET_KEY` | Firma de la sesión; Render la genera | En producción |
 | `DATABASE_URL` | Conexión a PostgreSQL; sin ella se usa SQLite | En producción |
+| `ANTHROPIC_API_KEY` | Clave del modelo de IA para el investigador y el guionista | Para usar los agentes |
+| `ANTHROPIC_MODEL` | Modelo a usar; por defecto `claude-sonnet-5-5` | No |
+
+Cada ejecución de un agente consume créditos de la API del modelo, y la
+búsqueda web del investigador se cobra aparte por búsqueda. Revisa los precios
+vigentes antes de ejecutarlos seguido.
 
 ## Estructura
 
@@ -75,6 +84,7 @@ app/
   models.py      Tablas de la base de datos
   db.py          Conexión a la base de datos
   seed.py        Datos iniciales (ajustes, plataformas, agentes, primeros temas)
+  agents/        Agentes: cliente del modelo de IA, investigador, guionista y ejecutor
   templates/     Pantallas
   static/        Estilos
 render.yaml      Configuración de Render

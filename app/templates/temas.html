@@ -15,6 +15,14 @@
   <button class="boton primario" type="submit">Agregar tema</button>
 </form>
 
+<form method="post" action="/temas/pedir" class="tarjeta fila" style="align-items: flex-end; gap: 12px">
+  <label class="campo" style="flex: 0 1 220px">Temas que busca el investigador
+    <input type="number" name="cantidad" min="1" max="10" value="5">
+  </label>
+  <button class="boton contorno" type="submit">Pedir temas al investigador</button>
+  <p class="suave chico" style="flex: 1 1 260px">Busca en la web, propone temas nuevos y registra cada dato con sus fuentes. Tarda uno o dos minutos.</p>
+</form>
+
 <div class="fila">
   <a class="filtro" href="/temas?estado=proposed" aria-current="{{ 'true' if estado == 'proposed' else 'false' }}">Propuestos</a>
   <a class="filtro" href="/temas?estado=used" aria-current="{{ 'true' if estado == 'used' else 'false' }}">Convertidos en video</a>

@@ -70,6 +70,13 @@
   <div><button class="boton primario" type="submit">Guardar cambios</button></div>
 </form>
 
+{% if video.status in ["in_production", "rejected", "pending_review"] %}
+<form method="post" action="/videos/{{ video.id }}/guion" class="tarjeta fila" style="gap: 12px">
+  <button class="boton contorno" type="submit">Escribir el guion con el guionista</button>
+  <p class="suave chico" style="flex: 1 1 260px">Usa solo los datos verificados de este tema y tus frases de Ajustes. Guarda una versión nueva del guion y manda el video a revisión. Guarda antes tus cambios: lo que no hayas guardado se pierde.</p>
+</form>
+{% endif %}
+
 {% if video.topic %}
 {% set topic = video.topic %}
 {% set volver = "/videos/" ~ video.id %}

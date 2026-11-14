@@ -196,7 +196,7 @@ class Video(Base):
 
     @property
     def current_script(self) -> Optional["Script"]:
-        return self.scripts[0] if self.scripts else None
+        return max(self.scripts, key=lambda s: s.version) if self.scripts else None
 
     @property
     def is_verified(self) -> bool:

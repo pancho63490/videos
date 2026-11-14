@@ -51,6 +51,42 @@
   <div><button class="boton primario" type="submit">Guardar ajustes</button></div>
 </form>
 
+<section class="tarjeta seccion" aria-labelledby="opiniones" id="opiniones-seccion">
+  <div>
+    <h2 id="opiniones">Tus frases y opiniones</h2>
+    <p class="suave chico">El guionista se apoya en estas frases para escribir la parte de opinión con tu estilo. Escribe cómo hablas tú: muletillas, posturas, humor.</p>
+  </div>
+  {% for o in opinions %}
+  <div class="dato">
+    <p style="flex: 1 1 320px; min-width: 0">{{ o.text }}</p>
+    <div class="fila">
+      <span class="suave chico">Usada {{ o.used_count }} {{ "vez" if o.used_count == 1 else "veces" }}</span>
+      <form method="post" action="/opiniones/{{ o.id }}/eliminar" class="en-linea">
+        <button class="boton chico" type="submit" aria-label="Eliminar frase: {{ o.text }}">Eliminar</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <p class="suave chico">Aún no hay frases. Sin ellas, la opinión de los guiones sonará genérica.</p>
+  {% endfor %}
+  <form method="post" action="/opiniones" class="fila" style="align-items: flex-end; gap: 12px; border-top: 1px solid var(--borde); padding-top: 16px">
+    <label class="campo" style="flex: 1 1 320px">Nueva frase
+      <input type="text" name="texto" maxlength="1000" placeholder="Por ejemplo: A mí lo que me vuela la cabeza es..." required>
+    </label>
+    <button class="boton" type="submit">Agregar frase</button>
+  </form>
+</section>
+
+<section class="tarjeta seccion" aria-labelledby="ia">
+  <h2 id="ia">Modelo de IA</h2>
+  {% if llm_ready %}
+  <p><span class="etiqueta verde">Clave configurada</span> <span class="suave chico">· Modelo: {{ llm_model }}</span></p>
+  {% else %}
+  <p><span class="etiqueta ambar">Falta la clave</span></p>
+  <p class="suave chico">Agrega la variable de entorno ANTHROPIC_API_KEY en Render (Environment) o en tu computadora. Opcionalmente, ANTHROPIC_MODEL para elegir el modelo.</p>
+  {% endif %}
+</section>
+
 <section class="tarjeta seccion" aria-labelledby="conexiones">
   <div>
     <h2 id="conexiones">Conexiones</h2>
@@ -64,7 +100,7 @@
       <span><span class="etiqueta {{ color }}">{{ etiqueta }}</span></span>
     </div>
     {% endfor %}
-    {% for s in services %}
+    {% for s in services if s.code != "llm" %}
     {% set etiqueta, color = connection_status[s.status] %}
     <div class="tarjeta pila" style="gap: 10px; padding: 16px">
       <strong>{{ s.name }}</strong>
