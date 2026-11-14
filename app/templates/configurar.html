@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Configuración inicial · Panel del canal</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="acceso">
+  <div class="tarjeta" style="max-width: 520px">
+    <div class="pila" style="gap: 6px">
+      <p class="suave chico">Paso 1 de 6</p>
+      <h1>Crea tu cuenta</h1>
+      <p class="suave">Es la primera vez que se abre el panel. Crea el usuario con el que vas a entrar.</p>
+    </div>
+
+    <div class="pila" style="gap: 8px; background: var(--gris-fondo); border-radius: 8px; padding: 16px">
+      <strong>¿Dónde está el código de configuración?</strong>
+      {% if on_render %}
+      <ol class="pasos-lista">
+        <li>Entra a Render y abre el servicio <code>canal-curiosidades</code>.</li>
+        <li>Abre la pestaña <strong>Logs</strong>.</li>
+        <li>Busca el recuadro que dice <strong>CONFIGURACIÓN INICIAL</strong> y copia el código, con la forma <code>XXXX-XXXX</code>.</li>
+      </ol>
+      {% else %}
+      <ol class="pasos-lista">
+        <li>Ve a la Terminal donde arrancaste el programa.</li>
+        <li>Busca el recuadro que dice <strong>CONFIGURACIÓN INICIAL</strong>.</li>
+        <li>Copia el código, con la forma <code>XXXX-XXXX</code>.</li>
+      </ol>
+      {% endif %}
+      <p class="suave chico">El código evita que otra persona cree la cuenta antes que tú. Solo se usa esta vez.</p>
+    </div>
+
+    {% if error %}<p class="aviso error" role="alert">{{ error }}</p>{% endif %}
+
+    <form method="post" action="/configurar" class="pila">
+      <label class="campo">Código de configuración
+        <input type="text" name="codigo" placeholder="XXXX-XXXX" autocomplete="off" autocapitalize="characters" required>
+      </label>
+      <label class="campo">Tu correo
+        <input type="email" name="email" value="{{ email }}" autocomplete="username" required>
+      </label>
+      <label class="campo">Contraseña (mínimo 10 caracteres)
+        <input type="password" name="password" minlength="10" autocomplete="new-password" required>
+      </label>
+      <label class="campo">Repite la contraseña
+        <input type="password" name="password2" minlength="10" autocomplete="new-password" required>
+      </label>
+      <button class="boton primario" type="submit">Crear cuenta y continuar</button>
+    </form>
+  </div>
+</main>
+</body>
+</html>

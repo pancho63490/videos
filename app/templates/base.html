@@ -17,12 +17,13 @@
     <span>Panel de administración</span>
   </div>
   <ul>
-    {% set secciones = [("/cola", "Cola de aprobación"), ("/calendario", "Calendario"), ("/temas", "Temas"), ("/videos", "Videos"), ("/agentes", "Agentes"), ("/ajustes", "Ajustes")] %}
+    {% set secciones = [("/guia", "Guía de inicio"), ("/cola", "Cola de aprobación"), ("/calendario", "Calendario"), ("/temas", "Temas"), ("/videos", "Videos"), ("/agentes", "Agentes"), ("/ajustes", "Ajustes")] %}
     {% for url, nombre in secciones %}
     <li>
       <a class="item" href="{{ url }}" {% if path.startswith(url) %}aria-current="page"{% endif %}>
         {{ nombre }}
         {% if url == "/cola" and pending_count %}<span class="contador">{{ pending_count }}</span>{% endif %}
+        {% if url == "/guia" and guide_count %}<span class="contador">{{ guide_count }}</span>{% endif %}
       </a>
     </li>
     {% endfor %}

@@ -83,14 +83,14 @@
   <p><span class="etiqueta verde">Clave configurada</span> <span class="suave chico">· Modelo: {{ llm_model }}</span></p>
   {% else %}
   <p><span class="etiqueta ambar">Falta la clave</span></p>
-  <p class="suave chico">Agrega la variable de entorno ANTHROPIC_API_KEY en Render (Environment) o en tu computadora. Opcionalmente, ANTHROPIC_MODEL para elegir el modelo.</p>
+  <p class="suave chico">Agrégala en la <a href="/guia#clave">Guía de inicio</a>, paso 3.</p>
   {% endif %}
 </section>
 
 <section class="tarjeta seccion" aria-labelledby="conexiones">
   <div>
     <h2 id="conexiones">Conexiones</h2>
-    <p class="suave chico">La conexión con cada plataforma se agregará junto con el agente publicador. Las claves nunca se guardan en la base de datos, solo en variables de entorno.</p>
+    <p class="suave chico">La conexión con cada plataforma se agregará junto con el agente publicador. </p>
   </div>
   <div class="rejilla chica">
     {% for a in accounts %}

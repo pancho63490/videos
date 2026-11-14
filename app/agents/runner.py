@@ -29,7 +29,7 @@ def execute(run_id: int, agent_code: str, **params) -> None:
         try:
             if not llm.is_configured():
                 raise llm.LLMError(
-                    "Falta la clave del modelo de IA. Agrega la variable de entorno ANTHROPIC_API_KEY."
+                    "Falta la clave del modelo de IA. Agrégala en la Guía de inicio."
                 )
             IMPLEMENTED[agent_code](db, lines.append, **params)
         except Exception as exc:  # se registra cualquier fallo en lugar de perderlo

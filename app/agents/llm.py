@@ -1,15 +1,15 @@
 """Cliente mínimo del modelo de IA (API de mensajes de Anthropic).
 
-Variables de entorno:
-  ANTHROPIC_API_KEY   clave de la API (obligatoria para que trabajen los agentes)
-  ANTHROPIC_MODEL     modelo a usar (opcional)
+La clave y el modelo se toman de las variables de entorno ANTHROPIC_API_KEY y
+ANTHROPIC_MODEL o, si no existen, de lo capturado en la Guía de inicio.
 """
 import json
-import os
 from dataclasses import dataclass, field
 from typing import Optional
 
 import httpx
+
+from .. import config
 
 API_URL = "https://api.anthropic.com/v1/messages"
 API_VERSION = "2023-06-01"
@@ -33,18 +33,18 @@ class LLMResult:
 
 
 def is_configured() -> bool:
-    return bool(os.getenv("ANTHROPIC_API_KEY"))
+    return bool(config.api_key())
 
 
 def model_name() -> str:
-    return os.getenv("ANTHROPIC_MODEL") or DEFAULT_MODEL
+    return config.model_override() or DEFAULT_MODEL
 
 
 def _post(payload: dict) -> dict:
     """Hace la llamada HTTP. Separada para poder sustituirla en las pruebas."""
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = config.api_key()
     if not api_key:
-        raise LLMError("Falta la variable de entorno ANTHROPIC_API_KEY.")
+        raise LLMError("Falta la clave del modelo de IA. Agrégala en la Guía de inicio.")
     try:
         response = httpx.post(
             API_URL,

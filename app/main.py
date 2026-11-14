@@ -15,6 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 from starlette.middleware.sessions import SessionMiddleware
 
+from . import config
 from .agents import llm, runner
 from .db import Base, SessionLocal, engine, get_db
 from .models import (
@@ -68,18 +69,33 @@ MONTH_NAMES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "o
 # --------------------------------------------------------------------------
 # Arranque
 # --------------------------------------------------------------------------
+# Las tablas se crean antes de armar la aplicación porque el secreto de la
+# sesión puede estar guardado en la base de datos.
+Base.metadata.create_all(bind=engine)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         seed(db)
+    if not config.admin_exists():
+        # Se imprime en la Terminal (o en los registros de Render) para que solo
+        # quien tiene acceso al servidor pueda crear la primera cuenta.
+        print(
+            "\n" + "=" * 62
+            + "\n  CONFIGURACIÓN INICIAL"
+            + "\n  Abre el panel en el navegador y usa este código para crear tu cuenta:"
+            + f"\n\n      {config.setup_code()}\n\n"
+            + "=" * 62 + "\n",
+            flush=True,
+        )
     yield
 
 
 app = FastAPI(title="Panel del canal de curiosidades", lifespan=lifespan, docs_url=None, redoc_url=None)
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SECRET_KEY") or secrets.token_urlsafe(32),
+    secret_key=config.session_secret(),
     session_cookie="panel_sesion",
     same_site="lax",
     https_only=bool(os.getenv("RENDER")),
@@ -94,7 +110,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 # --------------------------------------------------------------------------
 def get_settings(db: Session) -> dict:
     values = dict(DEFAULT_SETTINGS)
-    values.update({s.key: s.value for s in db.query(Setting).all()})
+    values.update({s.key: s.value for s in db.query(Setting).all() if s.key not in config.PRIVATE_KEYS})
     return values
 
 
@@ -144,6 +160,7 @@ def render(request: Request, db: Session, template: str, **context) -> HTMLRespo
         settings=settings,
         channel_name=settings.get("channel_name") or "Canal de curiosidades",
         pending_count=pending,
+        guide_count=guide_pending(db),
         flash=request.session.pop("flash", None),
         path=request.url.path,
         video_status=VIDEO_STATUS,
@@ -175,6 +192,35 @@ def approve(video: Video) -> None:
 
 
 # --------------------------------------------------------------------------
+# Guía de inicio
+# --------------------------------------------------------------------------
+MIN_OPINIONS = 3
+
+
+def guide_steps(db: Session) -> list:
+    """Pasos de configuración con su estado, en el orden en que conviene hacerlos."""
+    settings = get_settings(db)
+    opinions = db.query(func.count(OpinionBank.id)).scalar() or 0
+    topics = db.query(Topic).options(selectinload(Topic.facts)).all()
+    approved = (
+        db.query(func.count(Video.id)).filter(Video.status.in_(["approved", "scheduled", "published"])).scalar()
+        or 0
+    )
+    return [
+        {"key": "cuenta", "title": "Crea tu cuenta de administrador", "done": True},
+        {"key": "canal", "title": "Ponle nombre al canal", "done": bool(settings.get("channel_name"))},
+        {"key": "clave", "title": "Conecta el modelo de IA", "done": llm.is_configured()},
+        {"key": "frases", "title": "Agrega tus frases de opinión", "done": opinions >= MIN_OPINIONS},
+        {"key": "tema", "title": "Ten un tema con datos verificados", "done": any(t.is_verified for t in topics)},
+        {"key": "video", "title": "Aprueba tu primer video", "done": approved > 0},
+    ]
+
+
+def guide_pending(db: Session) -> int:
+    return sum(1 for step in guide_steps(db) if not step["done"])
+
+
+# --------------------------------------------------------------------------
 # Inicio de sesión
 # --------------------------------------------------------------------------
 class NotAuthenticated(Exception):
@@ -188,7 +234,7 @@ def require_login(request: Request) -> None:
 
 @app.exception_handler(NotAuthenticated)
 async def not_authenticated_handler(request: Request, _: NotAuthenticated):
-    return redirect("/login")
+    return redirect("/login" if config.admin_exists() else "/configurar")
 
 
 @app.get("/healthz")
@@ -198,31 +244,67 @@ def healthz():
 
 @app.get("/login", response_class=HTMLResponse)
 def login_form(request: Request):
+    if not config.admin_exists():
+        return redirect("/configurar")
     if request.session.get("user"):
         return redirect("/cola")
-    configured = bool(os.getenv("ADMIN_EMAIL") and os.getenv("ADMIN_PASSWORD"))
-    return templates.TemplateResponse(request, "login.html", {"error": None, "configured": configured})
+    return templates.TemplateResponse(request, "login.html", {"error": None})
 
 
 @app.post("/login", response_class=HTMLResponse)
-def login(request: Request, email: str = Form(""), password: str = Form("")):
-    admin_email = os.getenv("ADMIN_EMAIL", "")
-    admin_password = os.getenv("ADMIN_PASSWORD", "")
-    configured = bool(admin_email and admin_password)
-    ok = (
-        configured
-        and secrets.compare_digest(email.strip().lower().encode(), admin_email.strip().lower().encode())
-        and secrets.compare_digest(password.encode(), admin_password.encode())
+def login(request: Request, email: str = Form(""), password: str = Form(""), db: Session = Depends(get_db)):
+    if not config.admin_exists():
+        return redirect("/configurar")
+    user = config.check_login(email, password)
+    if user is None:
+        return templates.TemplateResponse(
+            request, "login.html", {"error": "Correo o contraseña incorrectos."}, status_code=401
+        )
+    request.session["user"] = user
+    return redirect("/guia" if guide_pending(db) else "/cola")
+
+
+@app.get("/configurar", response_class=HTMLResponse)
+def setup_form(request: Request):
+    if config.admin_exists():
+        return redirect("/login")
+    config.setup_code()  # asegura que exista aunque el servidor lleve tiempo encendido
+    return templates.TemplateResponse(
+        request, "configurar.html", {"error": None, "email": "", "on_render": bool(os.getenv("RENDER"))}
     )
-    if not ok:
+
+
+@app.post("/configurar", response_class=HTMLResponse)
+def setup(
+    request: Request,
+    codigo: str = Form(""),
+    email: str = Form(""),
+    password: str = Form(""),
+    password2: str = Form(""),
+):
+    if config.admin_exists():
+        return redirect("/login")
+    email = email.strip().lower()
+    error = None
+    if not config.check_setup_code(codigo):
+        error = "El código de configuración no coincide. Cópialo de la Terminal donde arrancaste el programa."
+    elif "@" not in email or len(email) > 200:
+        error = "Escribe un correo válido."
+    elif len(password) < config.MIN_PASSWORD_LENGTH:
+        error = f"La contraseña debe tener al menos {config.MIN_PASSWORD_LENGTH} caracteres."
+    elif password != password2:
+        error = "Las dos contraseñas no coinciden."
+    if error:
         return templates.TemplateResponse(
             request,
-            "login.html",
-            {"error": "Correo o contraseña incorrectos.", "configured": configured},
-            status_code=401,
+            "configurar.html",
+            {"error": error, "email": email, "on_render": bool(os.getenv("RENDER"))},
+            status_code=400,
         )
-    request.session["user"] = admin_email
-    return redirect("/cola")
+    config.create_admin(email, password)
+    request.session["user"] = email
+    flash(request, "Cuenta creada. Sigue la guía para terminar de configurar el canal.")
+    return redirect("/guia")
 
 
 @app.post("/logout")
@@ -634,7 +716,7 @@ def toggle_agent(agent_id: int, request: Request, db: Session = Depends(get_db))
 def launch_agent(background: BackgroundTasks, request: Request, code: str, message: str, **params) -> bool:
     """Arranca un agente en segundo plano. Devuelve False si falta la clave del modelo."""
     if not llm.is_configured():
-        flash(request, "Falta la clave del modelo de IA: agrega la variable de entorno ANTHROPIC_API_KEY.")
+        flash(request, "Falta la clave del modelo de IA. Agrégala en la Guía de inicio, paso 3.")
         return False
     run_id = runner.start_run(code)
     background.add_task(runner.execute, run_id, code, **params)
@@ -720,13 +802,15 @@ def settings_page(request: Request, db: Session = Depends(get_db)):
 
 
 @panel.post("/opiniones")
-def add_opinion(request: Request, texto: str = Form(""), db: Session = Depends(get_db)):
+def add_opinion(
+    request: Request, texto: str = Form(""), volver: str = Form(""), db: Session = Depends(get_db)
+):
     text = texto.strip()
     if text:
         db.add(OpinionBank(text=text[:1000]))
         db.commit()
         flash(request, "Frase agregada.")
-    return redirect("/ajustes#opiniones")
+    return redirect(volver if volver.startswith("/guia") else "/ajustes#opiniones")
 
 
 @panel.post("/opiniones/{opinion_id}/eliminar")
@@ -782,6 +866,102 @@ def save_settings(
     db.commit()
     flash(request, "Ajustes guardados.")
     return redirect("/ajustes")
+
+
+# --------------------------------------------------------------------------
+# Guía de inicio (rutas)
+# --------------------------------------------------------------------------
+def mask_key(key: str) -> str:
+    return f"…{key[-4:]}" if len(key) > 8 else "…"
+
+
+@panel.get("/guia", response_class=HTMLResponse)
+def guide(request: Request, db: Session = Depends(get_db)):
+    steps = guide_steps(db)
+    key = config.api_key()
+    return render(
+        request,
+        db,
+        "guia.html",
+        steps=steps,
+        done_count=sum(1 for s in steps if s["done"]),
+        next_key=next((s["key"] for s in steps if not s["done"]), None),
+        admin_source=config.admin_source(),
+        admin_email=request.session.get("user"),
+        key_source=config.api_key_source(),
+        key_mask=mask_key(key) if key else "",
+        llm_model=llm.model_name(),
+        default_model=llm.DEFAULT_MODEL,
+        opinion_count=db.query(func.count(OpinionBank.id)).scalar() or 0,
+        min_opinions=MIN_OPINIONS,
+    )
+
+
+@panel.post("/guia/canal")
+def guide_channel(request: Request, nombre: str = Form(""), db: Session = Depends(get_db)):
+    name = nombre.strip()[:80]
+    if not name:
+        flash(request, "Escribe el nombre del canal.")
+        return redirect("/guia#canal")
+    config.set_value("channel_name", name)
+    flash(request, "Nombre del canal guardado.")
+    return redirect("/guia")
+
+
+@panel.post("/guia/clave")
+def guide_api_key(request: Request, clave: str = Form(""), modelo: str = Form("")):
+    key = clave.strip()
+    model = modelo.strip()[:100]
+    if key:
+        if len(key) < 20 or " " in key:
+            flash(request, "Esa clave no parece válida. Cópiala completa, sin espacios.")
+            return redirect("/guia#clave")
+        config.set_value("anthropic_api_key", key)
+    if model:
+        config.set_value("anthropic_model", model)
+    else:
+        config.delete_value("anthropic_model")
+    flash(request, "Clave guardada. Usa \"Probar la clave\" para confirmar que funciona." if key else "Modelo actualizado.")
+    return redirect("/guia#clave")
+
+
+@panel.post("/guia/clave/probar")
+def guide_test_key(request: Request):
+    if not llm.is_configured():
+        flash(request, "Primero guarda una clave.")
+        return redirect("/guia#clave")
+    try:
+        result = llm.complete("Responde con una sola palabra.", "Responde: listo", max_tokens=16)
+    except llm.LLMError as exc:
+        flash(request, f"La clave no funcionó. {exc}")
+    else:
+        flash(request, f"La clave funciona. El modelo {llm.model_name()} respondió: {result.text.strip()[:60]}")
+    return redirect("/guia#clave")
+
+
+@panel.post("/guia/clave/eliminar")
+def guide_delete_key(request: Request):
+    config.delete_value("anthropic_api_key")
+    flash(request, "Clave eliminada del panel.")
+    return redirect("/guia#clave")
+
+
+@panel.post("/guia/contrasena")
+def guide_change_password(
+    request: Request, actual: str = Form(""), nueva: str = Form(""), nueva2: str = Form("")
+):
+    if config.admin_source() != "panel":
+        flash(request, "La contraseña está definida en variables de entorno; cámbiala ahí.")
+    elif config.check_login(request.session.get("user", ""), actual) is None:
+        flash(request, "La contraseña actual no es correcta.")
+    elif len(nueva) < config.MIN_PASSWORD_LENGTH:
+        flash(request, f"La contraseña nueva debe tener al menos {config.MIN_PASSWORD_LENGTH} caracteres.")
+    elif nueva != nueva2:
+        flash(request, "Las dos contraseñas nuevas no coinciden.")
+    else:
+        config.change_password(nueva)
+        flash(request, "Contraseña cambiada.")
+    return redirect("/guia#cuenta")
 
 
 app.include_router(panel)

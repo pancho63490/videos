@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block titulo %}Guía de inicio{% endblock %}
+{% block contenido %}
+<header class="encabezado">
+  <div>
+    <h1>Guía de inicio</h1>
+    {% if done_count == steps|length %}
+    <p class="suave">Todo está configurado. Puedes volver aquí cuando quieras cambiar la clave o tu contraseña.</p>
+    {% else %}
+    <p class="suave">Llevas {{ done_count }} de {{ steps|length }} pasos. Sigue el orden: cada paso te dice qué falta y cómo resolverlo.</p>
+    {% endif %}
+  </div>
+</header>
+
+{% macro estado(step) %}
+  {% if step.done %}<span class="etiqueta verde">Listo</span>
+  {% elif step.key == next_key %}<span class="etiqueta ambar">Sigue este</span>
+  {% else %}<span class="etiqueta gris">Pendiente</span>{% endif %}
+{% endmacro %}
+
+{# ---------------------------------------------------------------- 1 #}
+{% set s = steps[0] %}
+<section class="tarjeta paso" id="cuenta" aria-labelledby="t-cuenta">
+  <div class="paso-titulo"><span class="numero" aria-hidden="true">1</span><h2 id="t-cuenta">{{ s.title }}</h2>{{ estado(s) }}</div>
+  <p>Entraste como <strong>{{ admin_email }}</strong>.</p>
+  {% if admin_source == "panel" %}
+  <details>
+    <summary>Cambiar mi contraseña</summary>
+    <form method="post" action="/guia/contrasena" class="pila" style="margin-top: 12px">
+      <div class="campos">
+        <label class="campo">Contraseña actual
+          <input type="password" name="actual" autocomplete="current-password" required>
+        </label>
+        <label class="campo">Nueva (mínimo 10 caracteres)
+          <input type="password" name="nueva" minlength="10" autocomplete="new-password" required>
+        </label>
+        <label class="campo">Repite la nueva
+          <input type="password" name="nueva2" minlength="10" autocomplete="new-password" required>
+        </label>
+      </div>
+      <div><button class="boton" type="submit">Cambiar contraseña</button></div>
+    </form>
+  </details>
+  {% else %}
+  <p class="suave chico">Tu cuenta está definida en las variables de entorno ADMIN_EMAIL y ADMIN_PASSWORD. Para cambiar la contraseña, edita esas variables.</p>
+  {% endif %}
+</section>
+
+{# ---------------------------------------------------------------- 2 #}
+{% set s = steps[1] %}
+<section class="tarjeta paso" id="canal" aria-labelledby="t-canal">
+  <div class="paso-titulo"><span class="numero" aria-hidden="true">2</span><h2 id="t-canal">{{ s.title }}</h2>{{ estado(s) }}</div>
+  <p class="suave">Usa el mismo nombre que tendrá el canal en YouTube, TikTok, Facebook e Instagram. Aparece en el menú del panel.</p>
+  <form method="post" action="/guia/canal" class="fila" style="align-items: flex-end; gap: 12px">
+    <label class="campo" style="flex: 1 1 280px">Nombre del canal
+      <input type="text" name="nombre" maxlength="80" value="{{ settings.channel_name }}" required>
+    </label>
+    <button class="boton {{ 'primario' if not s.done }}" type="submit">Guardar nombre</button>
+  </form>
+</section>
+
+{# ---------------------------------------------------------------- 3 #}
+{% set s = steps[2] %}
+<section class="tarjeta paso" id="clave" aria-labelledby="t-clave">
+  <div class="paso-titulo"><span class="numero" aria-hidden="true">3</span><h2 id="t-clave">{{ s.title }}</h2>{{ estado(s) }}</div>
+  <p class="suave">El investigador y el guionista necesitan una clave de API de Anthropic. Sin ella, el panel funciona pero tú escribes todo a mano.</p>
+
+  {% if s.done %}
+  <p>
+    <span class="etiqueta verde">Clave configurada</span>
+    <span class="suave chico">· Termina en {{ key_mask }} · Modelo: {{ llm_model }} ·
+      {{ "Viene de la variable de entorno ANTHROPIC_API_KEY" if key_source == "env" else "Guardada en el panel" }}</span>
+  </p>
+  <div class="fila">
+    <form method="post" action="/guia/clave/probar" class="en-linea">
+      <button class="boton contorno" type="submit">Probar la clave</button>
+    </form>
+    {% if key_source == "panel" %}
+    <form method="post" action="/guia/clave/eliminar" class="en-linea">
+      <button class="boton" type="submit">Quitar la clave</button>
+    </form>
+    {% endif %}
+  </div>
+  <p class="suave chico">"Probar la clave" hace una llamada mínima al modelo; su costo es de una fracción de centavo.</p>
+  {% endif %}
+
+  <details {{ "open" if not s.done }}>
+    <summary>{{ "Cambiar la clave o el modelo" if s.done else "Cómo conseguir la clave" }}</summary>
+    <ol class="pasos-lista" style="margin-top: 12px">
+      <li>Abre la consola de Anthropic en <strong>console.anthropic.com</strong> y crea una cuenta o inicia sesión.</li>
+      <li>En <strong>Billing</strong>, agrega saldo. Para probar basta el monto mínimo.</li>
+      <li>En <strong>API keys</strong>, elige <strong>Create key</strong> y ponle un nombre, por ejemplo "canal".</li>
+      <li>Copia la clave en ese momento: solo se muestra una vez. Empieza con <code>sk-ant-</code>.</li>
+      <li>Pégala aquí abajo y guarda. Después usa "Probar la clave".</li>
+    </ol>
+    {% if key_source == "env" %}
+    <p class="aviso error" style="margin-top: 12px">Ahora mismo manda la variable de entorno ANTHROPIC_API_KEY. Lo que guardes aquí solo se usará si quitas esa variable.</p>
+    {% endif %}
+    <form method="post" action="/guia/clave" class="pila" style="margin-top: 12px">
+      <div class="campos">
+        <label class="campo">Clave de API
+          <input type="password" name="clave" placeholder="sk-ant-..." autocomplete="off" {{ "required" if not s.done }}>
+        </label>
+        <label class="campo">Modelo (opcional)
+          <input type="text" name="modelo" placeholder="{{ default_model }}" value="{{ llm_model if llm_model != default_model else '' }}">
+        </label>
+      </div>
+      <div><button class="boton {{ 'primario' if not s.done }}" type="submit">Guardar clave</button></div>
+    </form>
+    <p class="suave chico" style="margin-top: 8px">La clave se guarda en la base de datos del panel y no vuelve a mostrarse completa. Cada uso de los agentes consume saldo de esa cuenta.</p>
+  </details>
+</section>
+
+{# ---------------------------------------------------------------- 4 #}
+{% set s = steps[3] %}
+<section class="tarjeta paso" id="frases" aria-labelledby="t-frases">
+  <div class="paso-titulo"><span class="numero" aria-hidden="true">4</span><h2 id="t-frases">{{ s.title }}</h2>{{ estado(s) }}</div>
+  <p class="suave">El guionista usa tus frases para que la opinión de cada video suene a ti. Escribe como hablas: muletillas, posturas, humor. Llevas {{ opinion_count }} de {{ min_opinions }}.</p>
+  <form method="post" action="/opiniones" class="fila" style="align-items: flex-end; gap: 12px">
+    <label class="campo" style="flex: 1 1 320px">Nueva frase
+      <input type="text" name="texto" maxlength="1000" placeholder="Por ejemplo: A mí lo que me vuela la cabeza es..." required>
+    </label>
+    <input type="hidden" name="volver" value="/guia#frases">
+    <button class="boton {{ 'primario' if not s.done }}" type="submit">Agregar frase</button>
+  </form>
+  <p class="chico"><a href="/ajustes#opiniones">Ver y borrar mis frases en Ajustes</a></p>
+</section>
+
+{# ---------------------------------------------------------------- 5 #}
+{% set s = steps[4] %}
+<section class="tarjeta paso" id="tema" aria-labelledby="t-tema">
+  <div class="paso-titulo"><span class="numero" aria-hidden="true">5</span><h2 id="t-tema">{{ s.title }}</h2>{{ estado(s) }}</div>
+  <p class="suave">Un tema está verificado cuando todos sus datos tienen dos fuentes de sitios distintos. Hay dos caminos:</p>
+  <ol class="pasos-lista">
+    <li><strong>Con el investigador:</strong> pídele temas y él registra los datos con sus fuentes. Requiere el paso 3.</li>
+    <li><strong>A mano:</strong> abre un tema de la lista y agrega cada dato con sus dos enlaces.</li>
+  </ol>
+  <div class="fila">
+    {% if steps[2].done %}
+    <form method="post" action="/temas/pedir" class="en-linea">
+      <input type="hidden" name="cantidad" value="3">
+      <button class="boton {{ 'primario' if not s.done }}" type="submit">Pedir 3 temas al investigador</button>
+    </form>
+    {% endif %}
+    <a class="boton" href="/temas">Ir a Temas</a>
+  </div>
+</section>
+
+{# ---------------------------------------------------------------- 6 #}
+{% set s = steps[5] %}
+<section class="tarjeta paso" id="video" aria-labelledby="t-video">
+  <div class="paso-titulo"><span class="numero" aria-hidden="true">6</span><h2 id="t-video">{{ s.title }}</h2>{{ estado(s) }}</div>
+  <ol class="pasos-lista">
+    <li>En <a href="/temas">Temas</a>, elige uno verificado y dale "Hacer video".</li>
+    <li>En la página del video, usa "Escribir el guion con el guionista" o llena las cuatro partes a mano.</li>
+    <li>Asigna fecha y hora de publicación y guarda.</li>
+    <li>En la <a href="/cola">Cola de aprobación</a>, lee el guion y dale "Aprobar".</li>
+  </ol>
+</section>
+
+<section class="tarjeta paso" aria-labelledby="t-despues">
+  <div class="paso-titulo"><h2 id="t-despues">Lo que viene después</h2><span class="etiqueta gris">En construcción</span></div>
+  <p class="suave">Estos pasos se agregarán aquí cuando sus agentes estén listos: clon de voz, imágenes y clips, edición del video y conexión con YouTube, TikTok, Facebook e Instagram.</p>
+</section>
+{% endblock %}
